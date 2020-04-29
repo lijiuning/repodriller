@@ -37,7 +37,7 @@ public class Developer {
 	
 	@Override
 	public String toString() {
-		return "Committer [name=" + name + ", email=" + email + "]";
+		return "[name=" + name + ", email=" + email + "]";
 	}
 
 	

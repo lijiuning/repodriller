@@ -31,6 +31,7 @@ import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
@@ -522,6 +523,19 @@ public class GitRepository implements SCM {
 
 	public Integer getMaxNumberFilesInACommit() {
 		return maxNumberFilesInACommit;
+	}
+
+	public List<ChangeSet> getLog(String path, Date since, Date until){
+		List<ChangeSet> allCs = new ArrayList<>();
+		try (Git git = openRepository()) {
+			Iterable<RevCommit> commits = git.log().setRevFilter(CommitTimeRevFilter.between(since, until)).addPath(path).call();
+			for (RevCommit commit : commits) {
+				allCs.add(extractChangeSet(commit));
+			}
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return allCs;
 	}
 
 	@Override

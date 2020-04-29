@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.repodriller.RepoDrillerException;
 import org.repodriller.util.RDFileUtils;
 
@@ -38,7 +39,11 @@ public class GitRemoteRepository extends GitRepository {
 
 	/* Internal. */
 	private boolean hasLocalState = false;
+	public void setProvider(CredentialsProvider provider) {
+		this.provider = provider;
+	}
 
+	private CredentialsProvider provider;
 	/* User-defined. */
 	private String uri;
 	private Path path; /* TODO GitRepository also has a path member. Make it protected and inherit, or use getter/setter as needed? */
@@ -52,7 +57,7 @@ public class GitRemoteRepository extends GitRepository {
 	 * @throws IOException
 	 */
 	public GitRemoteRepository(String uri) {
-		this(uri, null, false);
+		this(uri, null, null, false);
 	}
 
 	/**
@@ -61,32 +66,32 @@ public class GitRemoteRepository extends GitRepository {
 	 *                   	If null, clones to a unique temp dir.
 	 * @param bare	Bare clone (metadata only) or full?
 	 */
-	public GitRemoteRepository(String uri, String destination, boolean bare) {
+	public GitRemoteRepository(String uri, String destination, CredentialsProvider provider, boolean bare) {
 		super();
 
 		try {
 			/* Set members. */
 			this.uri = uri;
 			this.bareClone = bare;
+			this.provider = provider;
 
 			/* Choose our own path? */
 			if (destination == null) {
-				/* Pick a temp dir name. */
-				String tempDirPath;
-				tempDirPath = RDFileUtils.getTempPath(null);
-				String repoName = repoNameFromURI(uri);
-				path = Paths.get(tempDirPath.toString() + "-" + repoName); // foo-RepoOne
+				throw new IllegalArgumentException();
 			}
-			else
+			else {
+				destination += repoNameFromURI(uri);
 				path = Paths.get(destination);
+			}
 
 			/* path must not exist already. */
 			if (RDFileUtils.exists(path)) {
-				throw new RepoDrillerException("Error, path " + path + " already exists");
+				//throw new RepoDrillerException("Error, path " + path + " already exists");
+				fetchGitRepository(path);
+			}else {
+				/* Clone the remote repo. */
+				cloneGitRepository(uri, path, bare);
 			}
-
-			/* Clone the remote repo. */
-			cloneGitRepository(uri, path, bare);
 			hasLocalState = true;
 		} catch (IOException|GitAPIException|RepoDrillerException e) {
 			log.error("Unsuccessful git remote repository initialization", e);
@@ -98,6 +103,19 @@ public class GitRemoteRepository extends GitRepository {
 		/* Fill in GitRepository details. */
 		this.setPath(path.toString());
 		this.setFirstParentOnly(true); /* TODO. */
+	}
+
+	private void fetchGitRepository(Path dest) throws GitAPIException, IOException {
+		File directory = new File(dest.toString());
+
+		if (!directory.exists())
+			throw new RepoDrillerException("Error, destination " + dest.toString() + " doesn't exists");
+
+
+		Git.open(directory)
+				.fetch()
+				.setCredentialsProvider(provider)
+				.call();
 	}
 
 	/**
@@ -118,6 +136,7 @@ public class GitRemoteRepository extends GitRepository {
 		Git.cloneRepository()
 				.setURI(uri)
 				.setBare(bare)
+				.setCredentialsProvider(provider)
 				.setDirectory(directory)
 				.setCloneAllBranches(true)
 				.setNoCheckout(false)
@@ -156,7 +175,12 @@ public class GitRemoteRepository extends GitRepository {
 
 	@SuppressWarnings("resource")
 	public static SCMRepository singleProject(String url, String rootpath, boolean bare) {
-		return new GitRemoteRepository(url, rootpath, bare).info();
+		return new GitRemoteRepository(url, rootpath, null, bare).info();
+	}
+
+	@SuppressWarnings("resource")
+	public static SCMRepository singleProject(String url, String rootpath, CredentialsProvider provider, boolean bare) {
+		return new GitRemoteRepository(url, rootpath, provider, bare).info();
 	}
 
 	public static SCMRepository[] allProjectsIn(List<String> urls) throws GitAPIException, IOException {

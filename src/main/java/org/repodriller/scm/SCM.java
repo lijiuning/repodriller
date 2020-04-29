@@ -17,6 +17,7 @@
 package org.repodriller.scm;
 
 import java.nio.file.Path;
+import java.util.Date;
 import java.util.List;
 
 import org.repodriller.domain.ChangeSet;
@@ -128,4 +129,7 @@ public interface SCM {
 	 * Default should be to collect *everything*
 	 */
 	void setDataToCollect(CollectConfiguration config);
+
+	List<ChangeSet> getLog(String path, Date since, Date until);
+
 }
